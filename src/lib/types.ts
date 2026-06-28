@@ -10,10 +10,13 @@ export type Kanji = {
   updated_at: string;
 };
 
+export type QuizMode = "read" | "write";
+
 export type KanjiMistake = {
   character: string;
   correct_readings: string[];
   your_answer: string;
+  mode?: QuizMode;
 };
 
 export type ReviewStage = 0 | 1 | 2;

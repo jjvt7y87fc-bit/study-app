@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { Grade, Kanji, KanjiReview, QuizCandidate } from "@/lib/types";
+import type { Grade, Kanji, KanjiReview, QuizCandidate, QuizMode } from "@/lib/types";
 import QuizClient from "@/app/kanji/quiz/QuizClient";
 
 export const dynamic = "force-dynamic";
@@ -28,10 +28,11 @@ function todayIso(): string {
 export default async function KanjiQuizPage({
   searchParams,
 }: {
-  searchParams: Promise<{ grades?: string }>;
+  searchParams: Promise<{ grades?: string; mode?: string }>;
 }) {
-  const { grades: gradesParam } = await searchParams;
+  const { grades: gradesParam, mode: modeParam } = await searchParams;
   const grades = parseGrades(gradesParam);
+  const mode: QuizMode = modeParam === "write" ? "write" : "read";
 
   if (grades.length === 0) {
     return (
@@ -94,5 +95,5 @@ export default async function KanjiQuizPage({
     );
   }
 
-  return <QuizClient candidates={candidates} grades={grades} />;
+  return <QuizClient candidates={candidates} grades={grades} mode={mode} />;
 }

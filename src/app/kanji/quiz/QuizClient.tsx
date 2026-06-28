@@ -7,7 +7,7 @@ import {
   saveKanjiQuizResult,
   type ReviewOutcome,
 } from "@/app/kanji/actions";
-import type { Grade, KanjiMistake, QuizCandidate } from "@/lib/types";
+import type { Grade, KanjiMistake, QuizCandidate, QuizMode } from "@/lib/types";
 
 const MISTAKE_LIMIT = 10;
 
@@ -16,9 +16,11 @@ type Phase = "quiz" | "result";
 export default function QuizClient({
   candidates,
   grades,
+  mode,
 }: {
   candidates: QuizCandidate[];
   grades: Grade[];
+  mode: QuizMode;
 }) {
   const [index, setIndex] = useState(0);
   const [answer, setAnswer] = useState("");
@@ -32,7 +34,10 @@ export default function QuizClient({
 
   const current = candidates[index];
   const wrongCount = mistakes.length;
-  const fontSizeClass = current.kanji.character.length <= 2 ? "text-7xl" : "text-5xl";
+  const promptText =
+    mode === "write" ? current.kanji.readings.join("・") : current.kanji.character;
+  const fontSizeClass =
+    mode === "read" && current.kanji.character.length <= 2 ? "text-7xl" : "text-5xl";
 
   if (hintShownForIndex !== index && showHint) {
     setShowHint(false);
@@ -44,7 +49,10 @@ export default function QuizClient({
   function submitAnswer(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = answer.trim();
-    const isCorrect = current.kanji.readings.includes(trimmed);
+    const isCorrect =
+      mode === "write"
+        ? trimmed === current.kanji.character
+        : current.kanji.readings.includes(trimmed);
 
     const newOutcomes = [
       ...outcomes,
@@ -67,6 +75,7 @@ export default function QuizClient({
           character: current.kanji.character,
           correct_readings: current.kanji.readings,
           your_answer: trimmed,
+          mode,
         },
       ];
       setMistakes(newMistakes);
@@ -124,7 +133,16 @@ export default function QuizClient({
               {mistakes.map((m, i) => (
                 <li key={i} className="text-sm text-gray-700">
                   <span className="text-lg font-bold">{m.character}</span>
-                  正解: {m.correct_readings.join("、")}　あなたの回答: {m.your_answer || "（無回答）"}
+                  {m.mode === "write" ? (
+                    <>
+                      正解の漢字: {m.character}　あなたの回答: {m.your_answer || "（無回答）"}
+                    </>
+                  ) : (
+                    <>
+                      正解: {m.correct_readings.join("、")}　あなたの回答:{" "}
+                      {m.your_answer || "（無回答）"}
+                    </>
+                  )}
                 </li>
               ))}
             </ul>
@@ -151,7 +169,7 @@ export default function QuizClient({
         第{index + 1}問　間違い {wrongCount} / {MISTAKE_LIMIT}
       </p>
       <div className="flex justify-center">
-        <span className={`${fontSizeClass} font-bold`}>{current.kanji.character}</span>
+        <span className={`${fontSizeClass} font-bold`}>{promptText}</span>
       </div>
       {current.kanji.meaning && (
         <div className="flex justify-center">
@@ -175,7 +193,7 @@ export default function QuizClient({
           autoFocus
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
-          placeholder="ひらがなで入力"
+          placeholder={mode === "write" ? "漢字で入力" : "ひらがなで入力"}
           className="w-64 rounded border px-4 py-3 text-center text-xl"
         />
         <button
