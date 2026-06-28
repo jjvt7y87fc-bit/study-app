@@ -1,12 +1,10 @@
 import { supabase } from "@/lib/supabase";
-import type { Grade, Kanji } from "@/lib/types";
+import { GRADES, GRADE_LABELS, type Kanji } from "@/lib/types";
 import { createKanji, deleteKanji, updateKanji } from "@/app/kanji/actions";
 import BulkImportForm from "@/app/kanji/manage/BulkImportForm";
 import DeleteRecordButton from "@/components/DeleteRecordButton";
 
 export const dynamic = "force-dynamic";
-
-const GRADES: Grade[] = [1, 2, 3, 4, 5, 6];
 
 async function getKanjiList(): Promise<Kanji[]> {
   const { data, error } = await supabase
@@ -55,7 +53,7 @@ export default async function KanjiManagePage() {
             <select name="grade" required className="rounded border px-3 py-2">
               {GRADES.map((g) => (
                 <option key={g} value={g}>
-                  {g}年生
+                  {GRADE_LABELS[g]}
                 </option>
               ))}
             </select>
@@ -117,7 +115,7 @@ function KanjiCard({ kanji }: { kanji: Kanji }) {
           >
             {GRADES.map((g) => (
               <option key={g} value={g}>
-                {g}年生
+                {GRADE_LABELS[g]}
               </option>
             ))}
           </select>

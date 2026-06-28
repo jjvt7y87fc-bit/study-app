@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { OPERATION_LABELS, type HyakumasuResult, type KanjiQuizResult } from "@/lib/types";
+import {
+  GRADE_LABELS,
+  OPERATION_LABELS,
+  type HyakumasuResult,
+  type KanjiQuizResult,
+} from "@/lib/types";
 import { deleteHyakumasuResult } from "@/app/hyakumasu/actions";
 import { deleteKanjiQuizResult } from "@/app/kanji/actions";
 import DeleteRecordButton from "@/components/DeleteRecordButton";
@@ -155,7 +160,7 @@ export default function CalendarView({
                   <li key={r.id} className="text-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span>{new Date(r.taken_at).toLocaleTimeString("ja-JP")}</span>
-                      <span>{r.grades.map((g) => `${g}年`).join("・")}</span>
+                      <span>{r.grades.map((g) => GRADE_LABELS[g]).join("・")}</span>
                       <span>
                         {r.correct_count}/{r.total_count}問正解
                       </span>

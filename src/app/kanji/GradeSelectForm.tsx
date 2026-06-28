@@ -2,9 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { Grade, QuizMode } from "@/lib/types";
-
-const GRADES: Grade[] = [1, 2, 3, 4, 5, 6];
+import { GRADES, GRADE_LABELS, type Grade, type QuizMode } from "@/lib/types";
 
 export default function GradeSelectForm({
   counts,
@@ -68,7 +66,7 @@ export default function GradeSelectForm({
                   : "bg-white text-gray-700"
               } ${counts[g] === 0 ? "cursor-not-allowed opacity-40" : ""}`}
             >
-              {g}年生（{counts[g]}問）
+              {GRADE_LABELS[g]}（{counts[g]}問）
             </button>
           ))}
         </div>

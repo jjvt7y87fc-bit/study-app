@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { Grade, Kanji, KanjiReview, QuizCandidate, QuizMode } from "@/lib/types";
+import { GRADES, type Grade, type Kanji, type KanjiReview, type QuizCandidate, type QuizMode } from "@/lib/types";
 import QuizClient from "@/app/kanji/quiz/QuizClient";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ function parseGrades(raw: string | undefined): Grade[] {
   return raw
     .split(",")
     .map((g) => Number(g))
-    .filter((g): g is Grade => [1, 2, 3, 4, 5, 6].includes(g));
+    .filter((g): g is Grade => (GRADES as number[]).includes(g));
 }
 
 function shuffle<T>(arr: T[]): T[] {

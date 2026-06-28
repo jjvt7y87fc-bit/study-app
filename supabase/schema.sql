@@ -4,11 +4,12 @@
 create extension if not exists "pgcrypto";
 
 -- 漢字データ（学年配当表に基づき管理UIから手入力する）
+-- grade: 1〜6=小学1〜6年, 7〜9=中学1〜3年, 10〜12=高校1〜3年
 create table if not exists kanji (
   id uuid primary key default gen_random_uuid(),
   character text not null,
   readings text[] not null default '{}',
-  grade smallint not null check (grade in (1, 2, 3, 4, 5, 6)),
+  grade smallint not null check (grade between 1 and 12),
   meaning text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { KanjiQuizResult } from "@/lib/types";
+import { GRADE_LABELS, type KanjiQuizResult } from "@/lib/types";
 import HistoryChart from "@/app/kanji/history/HistoryChart";
 import { deleteKanjiQuizResult } from "@/app/kanji/actions";
 import DeleteRecordButton from "@/components/DeleteRecordButton";
@@ -38,7 +38,7 @@ export default async function KanjiHistoryPage() {
               >
                 <summary className="cursor-pointer font-semibold text-gray-700">
                   {new Date(r.taken_at).toLocaleString("ja-JP")}　{r.grades
-                    .map((g) => `${g}年`)
+                    .map((g) => GRADE_LABELS[g])
                     .join("・")}　{r.correct_count}/{r.total_count}問正解
                 </summary>
                 <div className="mt-2">

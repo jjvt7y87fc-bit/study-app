@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import type { Grade } from "@/lib/types";
+import { GRADES, type Grade } from "@/lib/types";
 import GradeSelectForm from "@/app/kanji/GradeSelectForm";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ async function getGradeCounts(): Promise<Record<Grade, number>> {
   const { data, error } = await supabase.from("kanji").select("grade");
   if (error) throw new Error(error.message);
 
-  const counts: Record<Grade, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+  const counts = Object.fromEntries(GRADES.map((g) => [g, 0])) as Record<Grade, number>;
   for (const row of data ?? []) {
     counts[row.grade as Grade] += 1;
   }
