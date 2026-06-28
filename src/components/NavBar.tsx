@@ -4,10 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const links = [
-  { href: "/kanji", label: "漢字テスト" },
   { href: "/kanji/manage", label: "漢字管理" },
   { href: "/kanji/history", label: "漢字テスト結果" },
-  { href: "/hyakumasu", label: "百マス計算" },
   { href: "/calendar", label: "学習カレンダー" },
 ];
 
