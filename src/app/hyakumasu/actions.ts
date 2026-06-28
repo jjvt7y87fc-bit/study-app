@@ -17,5 +17,5 @@ export async function saveHyakumasuResult(params: {
 
   if (error) throw new Error(error.message);
 
-  revalidatePath("/hyakumasu/calendar");
+  revalidatePath("/calendar");
 }

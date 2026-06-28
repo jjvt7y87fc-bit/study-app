@@ -8,7 +8,7 @@ const links = [
   { href: "/kanji/manage", label: "漢字管理" },
   { href: "/kanji/history", label: "漢字テスト結果" },
   { href: "/hyakumasu", label: "百マス計算" },
-  { href: "/hyakumasu/calendar", label: "百マス計算カレンダー" },
+  { href: "/calendar", label: "学習カレンダー" },
 ];
 
 export default function NavBar() {

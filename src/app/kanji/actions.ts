@@ -140,6 +140,7 @@ export async function saveKanjiQuizResult(params: {
   if (error) throw new Error(error.message);
 
   revalidatePath("/kanji/history");
+  revalidatePath("/calendar");
 }
 
 export type ReviewOutcome = {

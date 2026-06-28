@@ -112,7 +112,7 @@ export default function PlayClient({ operation }: { operation: Operation }) {
             もう一度
           </Link>
           <Link
-            href="/hyakumasu/calendar"
+            href="/calendar"
             className="rounded bg-gray-600 px-4 py-2 text-white"
           >
             カレンダーを見る
