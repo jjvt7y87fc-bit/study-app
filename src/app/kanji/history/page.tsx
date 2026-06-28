@@ -1,6 +1,8 @@
 import { supabase } from "@/lib/supabase";
 import type { KanjiQuizResult } from "@/lib/types";
 import HistoryChart from "@/app/kanji/history/HistoryChart";
+import { deleteKanjiQuizResult } from "@/app/kanji/actions";
+import DeleteRecordButton from "@/components/DeleteRecordButton";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +41,9 @@ export default async function KanjiHistoryPage() {
                     .map((g) => `${g}年`)
                     .join("・")}　{r.correct_count}/{r.total_count}問正解
                 </summary>
+                <div className="mt-2">
+                  <DeleteRecordButton id={r.id} action={deleteKanjiQuizResult} />
+                </div>
                 {r.mistakes.length > 0 ? (
                   <ul className="mt-3 space-y-1 text-sm text-gray-700">
                     {r.mistakes.map((m, i) => (

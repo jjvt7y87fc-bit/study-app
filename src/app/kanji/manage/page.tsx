@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import type { Grade, Kanji } from "@/lib/types";
 import { createKanji, deleteKanji, updateKanji } from "@/app/kanji/actions";
 import BulkImportForm from "@/app/kanji/manage/BulkImportForm";
+import DeleteRecordButton from "@/components/DeleteRecordButton";
 
 export const dynamic = "force-dynamic";
 
@@ -99,56 +100,47 @@ export default async function KanjiManagePage() {
 
 function KanjiCard({ kanji }: { kanji: Kanji }) {
   return (
-    <form
-      action={updateKanji}
-      className="space-y-2 rounded-lg border bg-white p-4 shadow-sm"
-    >
-      <input type="hidden" name="id" value={kanji.id} />
-      <div className="flex items-center gap-3">
+    <div className="space-y-2 rounded-lg border bg-white p-4 shadow-sm">
+      <form action={updateKanji} className="space-y-2">
+        <input type="hidden" name="id" value={kanji.id} />
+        <div className="flex items-center gap-3">
+          <input
+            name="character"
+            defaultValue={kanji.character}
+            maxLength={8}
+            className="w-24 rounded border px-2 py-1 text-center text-2xl"
+          />
+          <select
+            name="grade"
+            defaultValue={kanji.grade}
+            className="rounded border px-2 py-1"
+          >
+            {GRADES.map((g) => (
+              <option key={g} value={g}>
+                {g}年生
+              </option>
+            ))}
+          </select>
+        </div>
         <input
-          name="character"
-          defaultValue={kanji.character}
-          maxLength={8}
-          className="w-24 rounded border px-2 py-1 text-center text-2xl"
+          name="readings"
+          defaultValue={kanji.readings.join("、")}
+          className="w-full rounded border px-2 py-1"
         />
-        <select
-          name="grade"
-          defaultValue={kanji.grade}
-          className="rounded border px-2 py-1"
-        >
-          {GRADES.map((g) => (
-            <option key={g} value={g}>
-              {g}年生
-            </option>
-          ))}
-        </select>
-      </div>
-      <input
-        name="readings"
-        defaultValue={kanji.readings.join("、")}
-        className="w-full rounded border px-2 py-1"
-      />
-      <input
-        name="meaning"
-        defaultValue={kanji.meaning ?? ""}
-        placeholder="意味（ヒント・省略可）"
-        className="w-full rounded border px-2 py-1 text-sm"
-      />
-      <div className="flex gap-2">
+        <input
+          name="meaning"
+          defaultValue={kanji.meaning ?? ""}
+          placeholder="意味（ヒント・省略可）"
+          className="w-full rounded border px-2 py-1 text-sm"
+        />
         <button
           type="submit"
           className="rounded bg-gray-700 px-3 py-1 text-sm font-semibold text-white hover:bg-gray-800"
         >
           更新
         </button>
-        <button
-          type="submit"
-          formAction={deleteKanji}
-          className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-700"
-        >
-          削除
-        </button>
-      </div>
-    </form>
+      </form>
+      <DeleteRecordButton id={kanji.id} action={deleteKanji} />
+    </div>
   );
 }

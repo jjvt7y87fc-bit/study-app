@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useState } from "react";
 import { OPERATION_LABELS, type HyakumasuResult, type KanjiQuizResult } from "@/lib/types";
+import { deleteHyakumasuResult } from "@/app/hyakumasu/actions";
+import { deleteKanjiQuizResult } from "@/app/kanji/actions";
+import DeleteRecordButton from "@/components/DeleteRecordButton";
 
 function dateKey(iso: string) {
   const d = new Date(iso);
@@ -130,11 +133,12 @@ export default function CalendarView({
             ) : (
               <ul className="space-y-2">
                 {selectedHyakumasu.map((r) => (
-                  <li key={r.id} className="flex justify-between text-sm">
+                  <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
                     <span>{new Date(r.taken_at).toLocaleTimeString("ja-JP")}</span>
                     <span>{OPERATION_LABELS[r.operation]}</span>
                     <span>{r.time_seconds.toFixed(1)}秒</span>
                     <span>{r.correct_count}/100</span>
+                    <DeleteRecordButton id={r.id} action={deleteHyakumasuResult} />
                   </li>
                 ))}
               </ul>
@@ -149,12 +153,13 @@ export default function CalendarView({
               <ul className="space-y-2">
                 {selectedKanji.map((r) => (
                   <li key={r.id} className="text-sm">
-                    <div className="flex justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <span>{new Date(r.taken_at).toLocaleTimeString("ja-JP")}</span>
                       <span>{r.grades.map((g) => `${g}年`).join("・")}</span>
                       <span>
                         {r.correct_count}/{r.total_count}問正解
                       </span>
+                      <DeleteRecordButton id={r.id} action={deleteKanjiQuizResult} />
                     </div>
                     {r.mistakes.length > 0 && (
                       <p className="mt-1 text-xs text-gray-500">

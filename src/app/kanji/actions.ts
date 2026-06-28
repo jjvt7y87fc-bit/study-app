@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
+import { checkDeletePassword } from "@/lib/deletePassword";
 import type { Grade, KanjiMistake, ReviewStage } from "@/lib/types";
 
 function parseReadings(raw: string): string[] {
@@ -114,14 +115,20 @@ export async function bulkCreateKanji(formData: FormData): Promise<BulkImportSum
   return { inserted: rows.length, errors };
 }
 
-export async function deleteKanji(formData: FormData) {
+export async function deleteKanji(
+  formData: FormData
+): Promise<{ success: boolean; error?: string }> {
   const id = String(formData.get("id") ?? "");
-  if (!id) throw new Error("idが必要です。");
+  const password = String(formData.get("password") ?? "");
+
+  const passwordError = checkDeletePassword(password);
+  if (passwordError) return { success: false, error: passwordError };
 
   const { error } = await supabase.from("kanji").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { success: false, error: error.message };
 
   revalidatePath("/kanji/manage");
+  return { success: true };
 }
 
 export async function saveKanjiQuizResult(params: {
@@ -141,6 +148,23 @@ export async function saveKanjiQuizResult(params: {
 
   revalidatePath("/kanji/history");
   revalidatePath("/calendar");
+}
+
+export async function deleteKanjiQuizResult(
+  formData: FormData
+): Promise<{ success: boolean; error?: string }> {
+  const id = String(formData.get("id") ?? "");
+  const password = String(formData.get("password") ?? "");
+
+  const passwordError = checkDeletePassword(password);
+  if (passwordError) return { success: false, error: passwordError };
+
+  const { error } = await supabase.from("kanji_quiz_results").delete().eq("id", id);
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/kanji/history");
+  revalidatePath("/calendar");
+  return { success: true };
 }
 
 export type ReviewOutcome = {
