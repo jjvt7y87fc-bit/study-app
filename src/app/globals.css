@@ -24,3 +24,19 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.nav-link {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+}
+
+.nav-link[data-active="true"] {
+  background-color: #2563eb;
+  color: #ffffff;
+}
+
+.nav-link[data-active="false"] {
+  color: #374151;
+}
+
