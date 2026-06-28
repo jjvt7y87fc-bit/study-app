@@ -12,12 +12,9 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* 端末のダークモード設定に関わらず、常に明るい配色に固定する
+   （フォームの文字色など、明示的に色を指定していない要素が
+   ダークモード時に薄いグレーになり読めなくなる問題を避けるため） */
 
 body {
   background: var(--background);
