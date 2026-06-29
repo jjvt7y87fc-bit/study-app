@@ -50,11 +50,19 @@ export default function PlayClient({ operation }: { operation: Operation }) {
   }, [phase]);
 
   function handleChange(idx: number, value: string) {
+    const digitsOnly = value.replace(/[^0-9]/g, "");
     setAnswers((prev) => {
       const next = [...prev];
-      next[idx] = value;
+      next[idx] = digitsOnly;
       return next;
     });
+
+    const r = Math.floor(idx / 10);
+    const c = idx % 10;
+    const expectedLength = String(compute(operation, top[c], left[r])).length;
+    if (digitsOnly.length >= expectedLength && digitsOnly.length > 0) {
+      inputRefs.current[idx + 1]?.focus();
+    }
   }
 
   function handleKeyDown(idx: number, e: React.KeyboardEvent) {
