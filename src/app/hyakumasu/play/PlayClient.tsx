@@ -33,6 +33,8 @@ type Phase = "playing" | "finished";
 export default function PlayClient({ operation }: { operation: Operation }) {
   const { top, left } = useMemo(() => generateHeaders(operation), [operation]);
   const [answers, setAnswers] = useState<string[]>(Array(100).fill(""));
+  const [correctness, setCorrectness] = useState<(boolean | null)[]>(Array(100).fill(null));
+  const [started, setStarted] = useState(false);
   const [phase, setPhase] = useState<Phase>("playing");
   const [elapsed, setElapsed] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
@@ -41,15 +43,19 @@ export default function PlayClient({ operation }: { operation: Operation }) {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
-    if (phase !== "playing") return;
-    startRef.current = Date.now();
+    if (!started || phase !== "playing") return;
     const id = setInterval(() => {
       setElapsed((Date.now() - (startRef.current ?? Date.now())) / 1000);
     }, 100);
     return () => clearInterval(id);
-  }, [phase]);
+  }, [started, phase]);
 
   function handleChange(idx: number, value: string) {
+    if (!started) {
+      startRef.current = Date.now();
+      setStarted(true);
+    }
+
     const digitsOnly = value.replace(/[^0-9]/g, "");
     setAnswers((prev) => {
       const next = [...prev];
@@ -59,9 +65,22 @@ export default function PlayClient({ operation }: { operation: Operation }) {
 
     const r = Math.floor(idx / 10);
     const c = idx % 10;
-    const expectedLength = String(compute(operation, top[c], left[r])).length;
-    if (digitsOnly.length >= expectedLength && digitsOnly.length > 0) {
-      inputRefs.current[idx + 1]?.focus();
+    const expected = compute(operation, top[c], left[r]);
+    const expectedLength = String(expected).length;
+    const isComplete = digitsOnly.length >= expectedLength && digitsOnly.length > 0;
+
+    setCorrectness((prev) => {
+      const next = [...prev];
+      next[idx] = isComplete ? Number(digitsOnly) === expected : null;
+      return next;
+    });
+
+    if (isComplete) {
+      if (idx === 99) {
+        void score();
+      } else {
+        inputRefs.current[idx + 1]?.focus();
+      }
     }
   }
 
@@ -165,6 +184,13 @@ export default function PlayClient({ operation }: { operation: Operation }) {
                 </td>
                 {top.map((_, c) => {
                   const idx = r * 10 + c;
+                  const state = correctness[idx];
+                  const cellClass =
+                    state === true
+                      ? "bg-green-50 text-green-700"
+                      : state === false
+                        ? "bg-red-50 text-red-700"
+                        : "";
                   return (
                     <td key={c} className="border p-0">
                       <input
@@ -175,7 +201,7 @@ export default function PlayClient({ operation }: { operation: Operation }) {
                         onChange={(e) => handleChange(idx, e.target.value)}
                         onKeyDown={(e) => handleKeyDown(idx, e)}
                         inputMode="numeric"
-                        className="h-8 w-8 text-center text-xs outline-none sm:h-10 sm:w-10 sm:text-base"
+                        className={`h-8 w-8 text-center text-xs outline-none sm:h-10 sm:w-10 sm:text-base ${cellClass}`}
                       />
                     </td>
                   );
