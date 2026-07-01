@@ -9,7 +9,15 @@ export async function saveHyakumasuResult(params: {
   operation: Operation;
   timeSeconds: number;
   correctCount: number;
-}) {
+}): Promise<{ previousResult: { time_seconds: number; correct_count: number } | null }> {
+  const { data: prevData } = await supabase
+    .from("hyakumasu_results")
+    .select("time_seconds, correct_count")
+    .eq("operation", params.operation)
+    .order("taken_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   const { error } = await supabase.from("hyakumasu_results").insert({
     operation: params.operation,
     time_seconds: params.timeSeconds,
@@ -19,6 +27,7 @@ export async function saveHyakumasuResult(params: {
   if (error) throw new Error(error.message);
 
   revalidatePath("/calendar");
+  return { previousResult: prevData ?? null };
 }
 
 export async function deleteHyakumasuResult(

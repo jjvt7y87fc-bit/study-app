@@ -16,7 +16,6 @@ function shuffledRange(start: number, count: number): number[] {
 
 function generateHeaders(operation: Operation): { top: number[]; left: number[] } {
   if (operation === "sub") {
-    // 上段(top)は十分大きい数、左列(left)は0-9。top - left が必ず0以上になるようにする。
     return { top: shuffledRange(9, 10), left: shuffledRange(0, 10) };
   }
   return { top: shuffledRange(0, 10), left: shuffledRange(0, 10) };
@@ -28,16 +27,25 @@ function compute(operation: Operation, top: number, left: number): number {
   return top * left;
 }
 
+function calcPoints(correctCount: number, timeSeconds: number): { base: number; timeBonus: number; total: number } {
+  const base = correctCount;
+  const timeBonus = Math.max(0, 100 - Math.floor(timeSeconds));
+  return { base, timeBonus, total: base + timeBonus };
+}
+
 type Phase = "playing" | "finished";
+type PreviousResult = { time_seconds: number; correct_count: number } | null;
 
 export default function PlayClient({ operation }: { operation: Operation }) {
   const { top, left } = useMemo(() => generateHeaders(operation), [operation]);
   const [answers, setAnswers] = useState<string[]>(Array(100).fill(""));
   const [correctness, setCorrectness] = useState<(boolean | null)[]>(Array(100).fill(null));
+  const [focusedIdx, setFocusedIdx] = useState<number | null>(null);
   const [started, setStarted] = useState(false);
   const [phase, setPhase] = useState<Phase>("playing");
   const [elapsed, setElapsed] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
+  const [previousResult, setPreviousResult] = useState<PreviousResult>(null);
   const [saving, setSaving] = useState(false);
   const startRef = useRef<number | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -111,43 +119,86 @@ export default function PlayClient({ operation }: { operation: Operation }) {
     setPhase("finished");
     setSaving(true);
     try {
-      await saveHyakumasuResult({
+      const { previousResult: prev } = await saveHyakumasuResult({
         operation,
         timeSeconds: Math.round(finalTime * 10) / 10,
         correctCount: correct,
       });
+      setPreviousResult(prev);
     } finally {
       setSaving(false);
     }
   }
 
   if (phase === "finished") {
+    const points = calcPoints(correctCount, elapsed);
+    const timeDiff = previousResult !== null ? elapsed - previousResult.time_seconds : null;
+    const countDiff = previousResult !== null ? correctCount - previousResult.correct_count : null;
+
     return (
       <div className="space-y-6 rounded-xl border bg-white p-6 shadow-sm">
         <h1 className="text-2xl font-bold text-gray-800">
           結果（{OPERATION_LABELS[operation]}）
         </h1>
-        <p className="text-xl">
-          所要時間: <span className="font-bold">{elapsed.toFixed(1)}</span> 秒
-        </p>
-        <p className="text-xl">
-          正解数: <span className="font-bold text-green-700">{correctCount}</span> / 100
-        </p>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="rounded-lg bg-gray-50 p-4 text-center">
+            <p className="text-sm text-gray-500">所要時間</p>
+            <p className="text-3xl font-bold">{elapsed.toFixed(1)}<span className="text-lg">秒</span></p>
+            {timeDiff !== null && (
+              <p className={`mt-1 text-sm font-semibold ${timeDiff < 0 ? "text-green-600" : "text-red-500"}`}>
+                {timeDiff < 0
+                  ? `▲ ${Math.abs(timeDiff).toFixed(1)}秒速い！`
+                  : `▼ ${timeDiff.toFixed(1)}秒遅い`}
+              </p>
+            )}
+          </div>
+          <div className="rounded-lg bg-gray-50 p-4 text-center">
+            <p className="text-sm text-gray-500">正解数</p>
+            <p className="text-3xl font-bold text-green-700">{correctCount}<span className="text-lg text-gray-400">/100</span></p>
+            {countDiff !== null && (
+              <p className={`mt-1 text-sm font-semibold ${countDiff > 0 ? "text-green-600" : countDiff < 0 ? "text-red-500" : "text-gray-500"}`}>
+                {countDiff > 0
+                  ? `▲ ${countDiff}問増加！`
+                  : countDiff < 0
+                    ? `▼ ${Math.abs(countDiff)}問減少`
+                    : "前回と同じ"}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-lg bg-yellow-50 p-4">
+          <p className="text-lg font-bold text-yellow-800">
+            ⭐ {points.total} ポイント獲得！
+          </p>
+          <p className="mt-1 text-sm text-yellow-700">
+            正解 {points.base}pt
+            {points.timeBonus > 0 && (
+              <span className="ml-2">＋ タイムボーナス {points.timeBonus}pt（{Math.floor(elapsed)}秒以内）</span>
+            )}
+          </p>
+        </div>
+
+        {previousResult === null && !saving && (
+          <p className="text-sm text-gray-400">（初回記録です）</p>
+        )}
         {saving && <p className="text-sm text-gray-500">結果を保存中...</p>}
+
         <div className="flex gap-3">
           <Link href="/hyakumasu" className="rounded bg-green-600 px-4 py-2 text-white">
             もう一度
           </Link>
-          <Link
-            href="/calendar"
-            className="rounded bg-gray-600 px-4 py-2 text-white"
-          >
+          <Link href="/calendar" className="rounded bg-gray-600 px-4 py-2 text-white">
             カレンダーを見る
           </Link>
         </div>
       </div>
     );
   }
+
+  const focusedRow = focusedIdx !== null ? Math.floor(focusedIdx / 10) : -1;
+  const focusedCol = focusedIdx !== null ? focusedIdx % 10 : -1;
 
   return (
     <div className="space-y-4">
@@ -168,46 +219,68 @@ export default function PlayClient({ operation }: { operation: Operation }) {
           <tbody>
             <tr>
               <td className="h-8 w-8 border bg-gray-100 text-xs sm:h-10 sm:w-10 sm:text-base"></td>
-              {top.map((t, i) => (
-                <td
-                  key={i}
-                  className="h-8 w-8 border bg-gray-100 text-xs font-bold sm:h-10 sm:w-10 sm:text-base"
-                >
-                  {t}
-                </td>
-              ))}
+              {top.map((t, c) => {
+                const isHighlighted = c === focusedCol;
+                return (
+                  <td
+                    key={c}
+                    className={`h-8 w-8 border text-xs font-bold sm:h-10 sm:w-10 sm:text-base transition-colors ${
+                      isHighlighted ? "bg-gray-800 text-white" : "bg-gray-100"
+                    }`}
+                  >
+                    {t}
+                  </td>
+                );
+              })}
             </tr>
-            {left.map((l, r) => (
-              <tr key={r}>
-                <td className="h-8 w-8 border bg-gray-100 text-xs font-bold sm:h-10 sm:w-10 sm:text-base">
-                  {l}
-                </td>
-                {top.map((_, c) => {
-                  const idx = r * 10 + c;
-                  const state = correctness[idx];
-                  const cellClass =
-                    state === true
-                      ? "bg-green-50 text-green-700"
-                      : state === false
-                        ? "bg-red-50 text-red-700"
-                        : "";
-                  return (
-                    <td key={c} className="border p-0">
-                      <input
-                        ref={(el) => {
-                          inputRefs.current[idx] = el;
-                        }}
-                        value={answers[idx]}
-                        onChange={(e) => handleChange(idx, e.target.value)}
-                        onKeyDown={(e) => handleKeyDown(idx, e)}
-                        inputMode="numeric"
-                        className={`h-8 w-8 text-center text-xs outline-none sm:h-10 sm:w-10 sm:text-base ${cellClass}`}
-                      />
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+            {left.map((l, r) => {
+              const isRowHighlighted = r === focusedRow;
+              return (
+                <tr key={r}>
+                  <td
+                    className={`h-8 w-8 border text-xs font-bold sm:h-10 sm:w-10 sm:text-base transition-colors ${
+                      isRowHighlighted ? "bg-gray-800 text-white" : "bg-gray-100"
+                    }`}
+                  >
+                    {l}
+                  </td>
+                  {top.map((_, c) => {
+                    const idx = r * 10 + c;
+                    const state = correctness[idx];
+                    const isFocused = focusedIdx === idx;
+                    const inCross = !isFocused && (r === focusedRow || c === focusedCol);
+
+                    let cellClass = "";
+                    if (isFocused) {
+                      cellClass = "bg-gray-900 text-white";
+                    } else if (state === true) {
+                      cellClass = inCross ? "bg-green-200 text-green-800" : "bg-green-50 text-green-700";
+                    } else if (state === false) {
+                      cellClass = inCross ? "bg-red-200 text-red-800" : "bg-red-50 text-red-700";
+                    } else if (inCross) {
+                      cellClass = "bg-yellow-100";
+                    }
+
+                    return (
+                      <td key={c} className="border p-0">
+                        <input
+                          ref={(el) => {
+                            inputRefs.current[idx] = el;
+                          }}
+                          value={answers[idx]}
+                          onChange={(e) => handleChange(idx, e.target.value)}
+                          onKeyDown={(e) => handleKeyDown(idx, e)}
+                          onFocus={() => setFocusedIdx(idx)}
+                          onBlur={() => setFocusedIdx(null)}
+                          inputMode="numeric"
+                          className={`h-8 w-8 text-center text-xs outline-none sm:h-10 sm:w-10 sm:text-base transition-colors ${cellClass}`}
+                        />
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

@@ -94,8 +94,8 @@ export async function bulkCreateKanji(formData: FormData): Promise<BulkImportSum
       errors.push({ line: i + 1, text: trimmed, reason: "読み方が空です" });
       return;
     }
-    if (!Number.isInteger(grade) || grade < 1 || grade > 6) {
-      errors.push({ line: i + 1, text: trimmed, reason: "学年は1〜6の数字で指定してください" });
+    if (!Number.isInteger(grade) || grade < 1 || grade > 12) {
+      errors.push({ line: i + 1, text: trimmed, reason: "学年は1〜12の数字で指定してください" });
       return;
     }
 
@@ -136,7 +136,7 @@ export async function saveKanjiQuizResult(params: {
   totalCount: number;
   correctCount: number;
   mistakes: KanjiMistake[];
-}) {
+}): Promise<{ earnedPoints: number; totalPoints: number }> {
   const { error } = await supabase.from("kanji_quiz_results").insert({
     grades: params.grades,
     total_count: params.totalCount,
@@ -146,8 +146,18 @@ export async function saveKanjiQuizResult(params: {
 
   if (error) throw new Error(error.message);
 
+  const { data: allResults } = await supabase
+    .from("kanji_quiz_results")
+    .select("correct_count");
+
+  const totalCorrect = (allResults ?? []).reduce((sum, r) => sum + (r.correct_count as number), 0);
+
   revalidatePath("/kanji/history");
   revalidatePath("/calendar");
+  return {
+    earnedPoints: params.correctCount * 10,
+    totalPoints: totalCorrect * 10,
+  };
 }
 
 export async function deleteKanjiQuizResult(

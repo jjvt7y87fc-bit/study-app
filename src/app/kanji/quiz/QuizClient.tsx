@@ -44,12 +44,16 @@ function ResultView({
   mistakes,
   saving,
   reachedLimit,
+  earnedPoints,
+  totalPoints,
 }: {
   totalAnswered: number;
   correctCount: number;
   mistakes: KanjiMistake[];
   saving: boolean;
   reachedLimit: boolean;
+  earnedPoints?: number;
+  totalPoints?: number;
 }) {
   return (
     <div className="space-y-6 rounded-xl border bg-white p-6 shadow-sm">
@@ -58,6 +62,21 @@ function ResultView({
         {totalAnswered}問中 <span className="font-bold text-blue-600">{correctCount}</span>{" "}
         問正解！
       </p>
+      {earnedPoints !== undefined && (
+        <div className="rounded-lg bg-yellow-50 p-4">
+          <p className="text-lg font-bold text-yellow-800">
+            ⭐ {earnedPoints.toLocaleString()} ポイント獲得！
+            <span className="ml-2 text-sm font-normal text-yellow-600">
+              （{correctCount}問 × 10pt）
+            </span>
+          </p>
+          {totalPoints !== undefined && (
+            <p className="mt-1 text-sm text-yellow-700">
+              累計ポイント：<span className="font-bold">{totalPoints.toLocaleString()}</span> pt
+            </p>
+          )}
+        </div>
+      )}
       {reachedLimit && (
         <p className="text-sm text-gray-500">
           {MISTAKE_LIMIT}問間違えたので、今日はここまでです。間違えた単語は翌日もう一度出題されます。
@@ -127,6 +146,8 @@ function ReadQuiz({ candidates, grades }: { candidates: QuizCandidate[]; grades:
   const [outcomes, setOutcomes] = useState<ReviewOutcome[]>([]);
   const [phase, setPhase] = useState<ReadPhase>("quiz");
   const [saving, setSaving] = useState(false);
+  const [earnedPoints, setEarnedPoints] = useState<number | undefined>(undefined);
+  const [totalPoints, setTotalPoints] = useState<number | undefined>(undefined);
 
   const current = candidates[index];
   const wrongCount = mistakes.length;
@@ -180,7 +201,7 @@ function ReadQuiz({ candidates, grades }: { candidates: QuizCandidate[]; grades:
     setPhase("result");
     setSaving(true);
     try {
-      await Promise.all([
+      const [pointsResult] = await Promise.all([
         saveKanjiQuizResult({
           grades,
           totalCount: finalOutcomes.length,
@@ -189,6 +210,8 @@ function ReadQuiz({ candidates, grades }: { candidates: QuizCandidate[]; grades:
         }),
         applyKanjiReviewUpdates(finalOutcomes),
       ]);
+      setEarnedPoints(pointsResult.earnedPoints);
+      setTotalPoints(pointsResult.totalPoints);
     } finally {
       setSaving(false);
     }
@@ -202,6 +225,8 @@ function ReadQuiz({ candidates, grades }: { candidates: QuizCandidate[]; grades:
         mistakes={mistakes}
         saving={saving}
         reachedLimit={mistakes.length >= MISTAKE_LIMIT}
+        earnedPoints={earnedPoints}
+        totalPoints={totalPoints}
       />
     );
   }
@@ -238,6 +263,8 @@ function WriteQuiz({ candidates, grades }: { candidates: QuizCandidate[]; grades
   const [judgments, setJudgments] = useState<Record<number, boolean>>({});
   const [phase, setPhase] = useState<WritePhase>("writing");
   const [saving, setSaving] = useState(false);
+  const [earnedPoints, setEarnedPoints] = useState<number | undefined>(undefined);
+  const [totalPoints, setTotalPoints] = useState<number | undefined>(undefined);
   const canvasRef = useRef<HandwritingCanvasHandle>(null);
 
   const current = batch[index];
@@ -287,7 +314,7 @@ function WriteQuiz({ candidates, grades }: { candidates: QuizCandidate[]; grades
     });
 
     try {
-      await Promise.all([
+      const [pointsResult] = await Promise.all([
         saveKanjiQuizResult({
           grades,
           totalCount: outcomes.length,
@@ -296,6 +323,8 @@ function WriteQuiz({ candidates, grades }: { candidates: QuizCandidate[]; grades
         }),
         applyKanjiReviewUpdates(outcomes),
       ]);
+      setEarnedPoints(pointsResult.earnedPoints);
+      setTotalPoints(pointsResult.totalPoints);
     } finally {
       setSaving(false);
       setPhase("result");
@@ -319,6 +348,8 @@ function WriteQuiz({ candidates, grades }: { candidates: QuizCandidate[]; grades
         mistakes={mistakes}
         saving={saving}
         reachedLimit={false}
+        earnedPoints={earnedPoints}
+        totalPoints={totalPoints}
       />
     );
   }
