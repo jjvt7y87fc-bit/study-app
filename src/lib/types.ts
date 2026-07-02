@@ -17,6 +17,13 @@ export const GRADE_LABELS: Record<Grade, string> = {
   12: "高校3年",
 };
 
+export type Profile = {
+  id: string;
+  name: string;
+  emoji: string;
+  created_at: string;
+};
+
 export type Kanji = {
   id: string;
   character: string;
@@ -57,6 +64,9 @@ export type KanjiQuizResult = {
   total_count: number;
   correct_count: number;
   mistakes: KanjiMistake[];
+  points: number;
+  profile_id: string | null;
+  profiles?: { name: string; emoji: string } | null;
 };
 
 export type Operation = "add" | "sub" | "mul";
@@ -67,6 +77,9 @@ export type HyakumasuResult = {
   operation: Operation;
   time_seconds: number;
   correct_count: number;
+  points: number;
+  profile_id: string | null;
+  profiles?: { name: string; emoji: string } | null;
 };
 
 export const OPERATION_LABELS: Record<Operation, string> = {

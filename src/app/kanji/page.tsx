@@ -25,7 +25,7 @@ export default async function KanjiTopPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-800">漢字テスト</h1>
         <Link
-          href="/kanji/manage"
+          href="/settings"
           className="text-sm font-semibold text-blue-600 hover:underline"
         >
           漢字データを管理する →

@@ -3,6 +3,14 @@
 
 create extension if not exists "pgcrypto";
 
+-- 家族のユーザープロファイル（本格ログインではなく「名前を選ぶだけ」の簡易切り替え用）
+create table if not exists profiles (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  emoji text not null default '🙂',
+  created_at timestamptz not null default now()
+);
+
 -- 漢字データ（学年配当表に基づき管理UIから手入力する）
 -- grade: 1〜6=小学1〜6年, 7〜9=中学1〜3年, 10〜12=高校1〜3年
 create table if not exists kanji (
@@ -24,10 +32,13 @@ create table if not exists kanji_quiz_results (
   grades smallint[] not null,
   total_count integer not null,
   correct_count integer not null,
-  mistakes jsonb not null default '[]'
+  mistakes jsonb not null default '[]',
+  points integer not null default 0,
+  profile_id uuid references profiles(id) on delete set null
 );
 
 create index if not exists kanji_quiz_results_taken_at_idx on kanji_quiz_results (taken_at desc);
+create index if not exists kanji_quiz_results_profile_id_idx on kanji_quiz_results (profile_id);
 
 -- 間違えた単語の再出題スケジュール（スペースド・リピティション）
 -- stage: 0=翌日に再出題待ち, 1=3日後に再出題待ち, 2=14日後に再出題待ち
@@ -51,10 +62,13 @@ create table if not exists hyakumasu_results (
   taken_at timestamptz not null default now(),
   operation text not null check (operation in ('add', 'sub', 'mul')),
   time_seconds numeric(6, 1) not null,
-  correct_count integer not null
+  correct_count integer not null,
+  points integer not null default 0,
+  profile_id uuid references profiles(id) on delete set null
 );
 
 create index if not exists hyakumasu_results_taken_at_idx on hyakumasu_results (taken_at desc);
+create index if not exists hyakumasu_results_profile_id_idx on hyakumasu_results (profile_id);
 
 -- 家庭内単一ユーザー利用のためログイン無し。
 -- サーバー側（Next.js Server Actions）からのみ service role キーでアクセスするため、
@@ -63,3 +77,4 @@ alter table kanji enable row level security;
 alter table kanji_quiz_results enable row level security;
 alter table hyakumasu_results enable row level security;
 alter table kanji_reviews enable row level security;
+alter table profiles enable row level security;

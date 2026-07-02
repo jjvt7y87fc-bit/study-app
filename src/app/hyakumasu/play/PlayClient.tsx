@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { saveHyakumasuResult } from "@/app/hyakumasu/actions";
+import { getPetStage } from "@/lib/pet";
+import PetStatus from "@/components/PetStatus";
 import { OPERATION_LABELS, type Operation } from "@/lib/types";
 
 function shuffledRange(start: number, count: number): number[] {
@@ -27,14 +29,79 @@ function compute(operation: Operation, top: number, left: number): number {
   return top * left;
 }
 
-function calcPoints(correctCount: number, timeSeconds: number): { base: number; timeBonus: number; total: number } {
-  const base = correctCount;
-  const timeBonus = Math.max(0, 100 - Math.floor(timeSeconds));
-  return { base, timeBonus, total: base + timeBonus };
-}
-
 type Phase = "playing" | "finished";
 type PreviousResult = { time_seconds: number; correct_count: number } | null;
+
+function ElapsedTimer({
+  active,
+  startRef,
+}: {
+  active: boolean;
+  startRef: React.RefObject<number | null>;
+}) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => {
+      setElapsed((Date.now() - (startRef.current ?? Date.now())) / 1000);
+    }, 100);
+    return () => clearInterval(id);
+  }, [active, startRef]);
+
+  return <p className="text-2xl font-mono font-bold text-green-700">{elapsed.toFixed(1)}秒</p>;
+}
+
+const Cell = memo(function Cell({
+  idx,
+  value,
+  state,
+  isFocused,
+  inCross,
+  setInputRef,
+  onChange,
+  onKeyDown,
+  onFocus,
+  onBlur,
+}: {
+  idx: number;
+  value: string;
+  state: boolean | null;
+  isFocused: boolean;
+  inCross: boolean;
+  setInputRef: (el: HTMLInputElement | null) => void;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  onFocus: (e: React.FocusEvent<HTMLInputElement>) => void;
+  onBlur: () => void;
+}) {
+  let cellClass = "";
+  if (isFocused) {
+    cellClass = "bg-gray-900 text-white";
+  } else if (state === true) {
+    cellClass = inCross ? "bg-green-200 text-green-800" : "bg-green-50 text-green-700";
+  } else if (state === false) {
+    cellClass = inCross ? "bg-red-200 text-red-800" : "bg-red-50 text-red-700";
+  } else if (inCross) {
+    cellClass = "bg-yellow-100";
+  }
+
+  return (
+    <td className="border p-0">
+      <input
+        ref={setInputRef}
+        data-idx={idx}
+        value={value}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        inputMode="numeric"
+        className={`h-8 w-8 text-center text-xs outline-none sm:h-10 sm:w-10 sm:text-base transition-colors ${cellClass}`}
+      />
+    </td>
+  );
+});
 
 export default function PlayClient({ operation }: { operation: Operation }) {
   const { top, left } = useMemo(() => generateHeaders(operation), [operation]);
@@ -43,56 +110,62 @@ export default function PlayClient({ operation }: { operation: Operation }) {
   const [focusedIdx, setFocusedIdx] = useState<number | null>(null);
   const [started, setStarted] = useState(false);
   const [phase, setPhase] = useState<Phase>("playing");
-  const [elapsed, setElapsed] = useState(0);
+  const [finalElapsed, setFinalElapsed] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [previousResult, setPreviousResult] = useState<PreviousResult>(null);
+  const [earnedPoints, setEarnedPoints] = useState(0);
+  const [totalPoints, setTotalPoints] = useState(0);
   const [saving, setSaving] = useState(false);
   const startRef = useRef<number | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  useEffect(() => {
-    if (!started || phase !== "playing") return;
-    const id = setInterval(() => {
-      setElapsed((Date.now() - (startRef.current ?? Date.now())) / 1000);
-    }, 100);
-    return () => clearInterval(id);
-  }, [started, phase]);
-
-  function handleChange(idx: number, value: string) {
-    if (!started) {
-      startRef.current = Date.now();
-      setStarted(true);
+  const setInputRef = useCallback((el: HTMLInputElement | null) => {
+    if (el) {
+      inputRefs.current[Number(el.dataset.idx)] = el;
     }
+  }, []);
 
-    const digitsOnly = value.replace(/[^0-9]/g, "");
-    setAnswers((prev) => {
-      const next = [...prev];
-      next[idx] = digitsOnly;
-      return next;
-    });
-
-    const r = Math.floor(idx / 10);
-    const c = idx % 10;
-    const expected = compute(operation, top[c], left[r]);
-    const expectedLength = String(expected).length;
-    const isComplete = digitsOnly.length >= expectedLength && digitsOnly.length > 0;
-
-    setCorrectness((prev) => {
-      const next = [...prev];
-      next[idx] = isComplete ? Number(digitsOnly) === expected : null;
-      return next;
-    });
-
-    if (isComplete) {
-      if (idx === 99) {
-        void score();
-      } else {
-        inputRefs.current[idx + 1]?.focus();
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const idx = Number(e.currentTarget.dataset.idx);
+      if (!startRef.current) {
+        startRef.current = Date.now();
+        setStarted(true);
       }
-    }
-  }
 
-  function handleKeyDown(idx: number, e: React.KeyboardEvent) {
+      const digitsOnly = e.target.value.replace(/[^0-9]/g, "");
+      setAnswers((prev) => {
+        const next = [...prev];
+        next[idx] = digitsOnly;
+        return next;
+      });
+
+      const r = Math.floor(idx / 10);
+      const c = idx % 10;
+      const expected = compute(operation, top[c], left[r]);
+      const expectedLength = String(expected).length;
+      const isComplete = digitsOnly.length >= expectedLength && digitsOnly.length > 0;
+
+      setCorrectness((prev) => {
+        const next = [...prev];
+        next[idx] = isComplete ? Number(digitsOnly) === expected : null;
+        return next;
+      });
+
+      if (isComplete) {
+        if (idx === 99) {
+          void score();
+        } else {
+          inputRefs.current[idx + 1]?.focus();
+        }
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [operation, top, left]
+  );
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    const idx = Number(e.currentTarget.dataset.idx);
     if (e.key === "Enter" || e.key === "ArrowRight") {
       inputRefs.current[idx + 1]?.focus();
     } else if (e.key === "ArrowLeft") {
@@ -102,7 +175,15 @@ export default function PlayClient({ operation }: { operation: Operation }) {
     } else if (e.key === "ArrowUp") {
       inputRefs.current[idx - 10]?.focus();
     }
-  }
+  }, []);
+
+  const handleFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    setFocusedIdx(Number(e.currentTarget.dataset.idx));
+  }, []);
+
+  const handleBlur = useCallback(() => {
+    setFocusedIdx(null);
+  }, []);
 
   async function score() {
     const finalTime = (Date.now() - (startRef.current ?? Date.now())) / 1000;
@@ -114,25 +195,33 @@ export default function PlayClient({ operation }: { operation: Operation }) {
         if (Number(answers[idx]) === expected) correct++;
       }
     }
-    setElapsed(finalTime);
+    setFinalElapsed(finalTime);
     setCorrectCount(correct);
     setPhase("finished");
     setSaving(true);
     try {
-      const { previousResult: prev } = await saveHyakumasuResult({
+      const {
+        previousResult: prev,
+        earnedPoints: earned,
+        totalPoints: total,
+      } = await saveHyakumasuResult({
         operation,
         timeSeconds: Math.round(finalTime * 10) / 10,
         correctCount: correct,
       });
       setPreviousResult(prev);
+      setEarnedPoints(earned);
+      setTotalPoints(total);
     } finally {
       setSaving(false);
     }
   }
 
   if (phase === "finished") {
-    const points = calcPoints(correctCount, elapsed);
-    const timeDiff = previousResult !== null ? elapsed - previousResult.time_seconds : null;
+    const timeBonus = Math.max(0, earnedPoints - correctCount);
+    const leveledUp =
+      totalPoints > 0 && getPetStage(totalPoints - earnedPoints).level < getPetStage(totalPoints).level;
+    const timeDiff = previousResult !== null ? finalElapsed - previousResult.time_seconds : null;
     const countDiff = previousResult !== null ? correctCount - previousResult.correct_count : null;
 
     return (
@@ -144,7 +233,7 @@ export default function PlayClient({ operation }: { operation: Operation }) {
         <div className="grid grid-cols-2 gap-4">
           <div className="rounded-lg bg-gray-50 p-4 text-center">
             <p className="text-sm text-gray-500">所要時間</p>
-            <p className="text-3xl font-bold">{elapsed.toFixed(1)}<span className="text-lg">秒</span></p>
+            <p className="text-3xl font-bold">{finalElapsed.toFixed(1)}<span className="text-lg">秒</span></p>
             {timeDiff !== null && (
               <p className={`mt-1 text-sm font-semibold ${timeDiff < 0 ? "text-green-600" : "text-red-500"}`}>
                 {timeDiff < 0
@@ -170,15 +259,17 @@ export default function PlayClient({ operation }: { operation: Operation }) {
 
         <div className="rounded-lg bg-yellow-50 p-4">
           <p className="text-lg font-bold text-yellow-800">
-            ⭐ {points.total} ポイント獲得！
+            ⭐ {earnedPoints} ポイント獲得！
           </p>
           <p className="mt-1 text-sm text-yellow-700">
-            正解 {points.base}pt
-            {points.timeBonus > 0 && (
-              <span className="ml-2">＋ タイムボーナス {points.timeBonus}pt（{Math.floor(elapsed)}秒以内）</span>
+            正解 {correctCount}pt
+            {timeBonus > 0 && (
+              <span className="ml-2">＋ タイムボーナス {timeBonus}pt（{Math.floor(finalElapsed)}秒以内）</span>
             )}
           </p>
         </div>
+
+        {!saving && <PetStatus totalPoints={totalPoints} leveledUp={leveledUp} />}
 
         {previousResult === null && !saving && (
           <p className="text-sm text-gray-400">（初回記録です）</p>
@@ -204,7 +295,7 @@ export default function PlayClient({ operation }: { operation: Operation }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between rounded-xl border bg-white p-4 shadow-sm">
         <h1 className="text-xl font-bold text-gray-800">{OPERATION_LABELS[operation]}</h1>
-        <p className="text-2xl font-mono font-bold text-green-700">{elapsed.toFixed(1)}秒</p>
+        <ElapsedTimer active={started && phase === "playing"} startRef={startRef} />
         <button
           type="button"
           onClick={score}
@@ -246,36 +337,23 @@ export default function PlayClient({ operation }: { operation: Operation }) {
                   </td>
                   {top.map((_, c) => {
                     const idx = r * 10 + c;
-                    const state = correctness[idx];
                     const isFocused = focusedIdx === idx;
                     const inCross = !isFocused && (r === focusedRow || c === focusedCol);
 
-                    let cellClass = "";
-                    if (isFocused) {
-                      cellClass = "bg-gray-900 text-white";
-                    } else if (state === true) {
-                      cellClass = inCross ? "bg-green-200 text-green-800" : "bg-green-50 text-green-700";
-                    } else if (state === false) {
-                      cellClass = inCross ? "bg-red-200 text-red-800" : "bg-red-50 text-red-700";
-                    } else if (inCross) {
-                      cellClass = "bg-yellow-100";
-                    }
-
                     return (
-                      <td key={c} className="border p-0">
-                        <input
-                          ref={(el) => {
-                            inputRefs.current[idx] = el;
-                          }}
-                          value={answers[idx]}
-                          onChange={(e) => handleChange(idx, e.target.value)}
-                          onKeyDown={(e) => handleKeyDown(idx, e)}
-                          onFocus={() => setFocusedIdx(idx)}
-                          onBlur={() => setFocusedIdx(null)}
-                          inputMode="numeric"
-                          className={`h-8 w-8 text-center text-xs outline-none sm:h-10 sm:w-10 sm:text-base transition-colors ${cellClass}`}
-                        />
-                      </td>
+                      <Cell
+                        key={c}
+                        idx={idx}
+                        value={answers[idx]}
+                        state={correctness[idx]}
+                        isFocused={isFocused}
+                        inCross={inCross}
+                        setInputRef={setInputRef}
+                        onChange={handleChange}
+                        onKeyDown={handleKeyDown}
+                        onFocus={handleFocus}
+                        onBlur={handleBlur}
+                      />
                     );
                   })}
                 </tr>

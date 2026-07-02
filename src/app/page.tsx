@@ -1,4 +1,8 @@
 import Link from "next/link";
+import PetStatus from "@/components/PetStatus";
+import { getTotalPoints } from "@/lib/petData";
+
+export const dynamic = "force-dynamic";
 
 const cards = [
   {
@@ -15,10 +19,13 @@ const cards = [
   },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const totalPoints = await getTotalPoints();
+
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-bold text-gray-800">学習アプリ</h1>
+      <PetStatus totalPoints={totalPoints} />
       <div className="grid gap-4 sm:grid-cols-2">
         {cards.map((card) => (
           <Link

@@ -7,6 +7,8 @@ import {
   saveKanjiQuizResult,
   type ReviewOutcome,
 } from "@/app/kanji/actions";
+import { getPetStage } from "@/lib/pet";
+import PetStatus from "@/components/PetStatus";
 import type { Grade, KanjiMistake, QuizCandidate, QuizMode } from "@/lib/types";
 import HandwritingCanvas, {
   type HandwritingCanvasHandle,
@@ -21,6 +23,14 @@ type WritePhase = "writing" | "grading" | "result";
 type Drawing = {
   candidate: QuizCandidate;
   dataUrl: string | null;
+};
+
+type ResultItem = {
+  character: string;
+  correctReadings: string[];
+  yourAnswer: string;
+  isCorrect: boolean;
+  mode: QuizMode;
 };
 
 export default function QuizClient({
@@ -39,27 +49,29 @@ export default function QuizClient({
 }
 
 function ResultView({
-  totalAnswered,
-  correctCount,
-  mistakes,
+  items,
   saving,
   reachedLimit,
   earnedPoints,
   totalPoints,
 }: {
-  totalAnswered: number;
-  correctCount: number;
-  mistakes: KanjiMistake[];
+  items: ResultItem[];
   saving: boolean;
   reachedLimit: boolean;
   earnedPoints?: number;
   totalPoints?: number;
 }) {
+  const correctCount = items.filter((i) => i.isCorrect).length;
+  const leveledUp =
+    totalPoints !== undefined &&
+    earnedPoints !== undefined &&
+    getPetStage(totalPoints - earnedPoints).level < getPetStage(totalPoints).level;
+
   return (
     <div className="space-y-6 rounded-xl border bg-white p-6 shadow-sm">
       <h1 className="text-2xl font-bold text-gray-800">結果</h1>
       <p className="text-xl">
-        {totalAnswered}問中 <span className="font-bold text-blue-600">{correctCount}</span>{" "}
+        {items.length}問中 <span className="font-bold text-blue-600">{correctCount}</span>{" "}
         問正解！
       </p>
       {earnedPoints !== undefined && (
@@ -70,12 +82,10 @@ function ResultView({
               （{correctCount}問 × 10pt）
             </span>
           </p>
-          {totalPoints !== undefined && (
-            <p className="mt-1 text-sm text-yellow-700">
-              累計ポイント：<span className="font-bold">{totalPoints.toLocaleString()}</span> pt
-            </p>
-          )}
         </div>
+      )}
+      {!saving && totalPoints !== undefined && (
+        <PetStatus totalPoints={totalPoints} leveledUp={leveledUp} />
       )}
       {reachedLimit && (
         <p className="text-sm text-gray-500">
@@ -83,29 +93,37 @@ function ResultView({
         </p>
       )}
       {saving && <p className="text-sm text-gray-500">結果を保存中...</p>}
-      {mistakes.length > 0 && (
-        <div>
-          <h2 className="mb-2 font-semibold text-gray-700">間違えた単語</h2>
-          <ul className="space-y-1">
-            {mistakes.map((m, i) => (
-              <li key={i} className="text-sm text-gray-700">
-                <span className="text-lg font-bold">{m.character}</span>
-                {m.mode === "write" ? (
-                  <>　正解の漢字: {m.character}</>
-                ) : (
-                  <>
-                    　正解: {m.correct_readings.join("、")}　あなたの回答:{" "}
-                    {m.your_answer || "（無回答）"}
-                  </>
-                )}
-              </li>
-            ))}
-          </ul>
+      <div>
+        <h2 className="mb-2 font-semibold text-gray-700">回答一覧</h2>
+        <ul className="space-y-1">
+          {items.map((item, i) => (
+            <li
+              key={i}
+              className={`flex flex-wrap items-center gap-2 text-sm ${
+                item.isCorrect ? "text-blue-700" : "text-red-600"
+              }`}
+            >
+              <span className="w-5 flex-none text-center text-lg font-bold">
+                {item.isCorrect ? "○" : "×"}
+              </span>
+              <span className="text-lg font-bold">{item.character}</span>
+              {item.mode === "write" ? (
+                <span>{item.isCorrect ? "正しく書けました" : "書けませんでした"}</span>
+              ) : (
+                <span>
+                  正解: {item.correctReadings.join("、")}　あなたの回答:{" "}
+                  {item.yourAnswer || "（無回答）"}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+        {correctCount < items.length && (
           <p className="mt-2 text-sm text-gray-500">
-            これらの単語は翌日・3日後・14日後に再出題され、正解し続けると出なくなります。
+            間違えた単語は翌日・3日後・14日後に再出題され、正解し続けると出なくなります。
           </p>
-        </div>
-      )}
+        )}
+      </div>
       <div className="flex gap-3">
         <Link href="/kanji" className="rounded bg-blue-600 px-4 py-2 text-white">
           もう一度
@@ -141,8 +159,7 @@ function HintBox({ meaning }: { meaning: string | null }) {
 function ReadQuiz({ candidates, grades }: { candidates: QuizCandidate[]; grades: Grade[] }) {
   const [index, setIndex] = useState(0);
   const [answer, setAnswer] = useState("");
-  const [correctCount, setCorrectCount] = useState(0);
-  const [mistakes, setMistakes] = useState<KanjiMistake[]>([]);
+  const [log, setLog] = useState<ResultItem[]>([]);
   const [outcomes, setOutcomes] = useState<ReviewOutcome[]>([]);
   const [phase, setPhase] = useState<ReadPhase>("quiz");
   const [saving, setSaving] = useState(false);
@@ -150,7 +167,7 @@ function ReadQuiz({ candidates, grades }: { candidates: QuizCandidate[]; grades:
   const [totalPoints, setTotalPoints] = useState<number | undefined>(undefined);
 
   const current = candidates[index];
-  const wrongCount = mistakes.length;
+  const wrongCount = log.filter((i) => !i.isCorrect).length;
   const fontSizeClass = current.kanji.character.length <= 2 ? "text-7xl" : "text-5xl";
 
   function submitAnswer(e: React.FormEvent) {
@@ -169,44 +186,49 @@ function ReadQuiz({ candidates, grades }: { candidates: QuizCandidate[]; grades:
     ];
     setOutcomes(newOutcomes);
 
-    let newMistakes = mistakes;
-    if (isCorrect) {
-      setCorrectCount((c) => c + 1);
-    } else {
-      newMistakes = [
-        ...mistakes,
-        {
-          character: current.kanji.character,
-          correct_readings: current.kanji.readings,
-          your_answer: trimmed,
-          mode: "read" as const,
-        },
-      ];
-      setMistakes(newMistakes);
-    }
+    const newLog: ResultItem[] = [
+      ...log,
+      {
+        character: current.kanji.character,
+        correctReadings: current.kanji.readings,
+        yourAnswer: trimmed,
+        isCorrect,
+        mode: "read",
+      },
+    ];
+    setLog(newLog);
 
     setAnswer("");
 
-    const reachedLimit = newMistakes.length >= MISTAKE_LIMIT;
+    const newWrongCount = newLog.filter((i) => !i.isCorrect).length;
+    const reachedLimit = newWrongCount >= MISTAKE_LIMIT;
     const isLastCandidate = index === candidates.length - 1;
 
     if (reachedLimit || isLastCandidate) {
-      void finish(newMistakes, newOutcomes);
+      void finish(newLog, newOutcomes);
     } else {
       setIndex((i) => i + 1);
     }
   }
 
-  async function finish(finalMistakes: KanjiMistake[], finalOutcomes: ReviewOutcome[]) {
+  async function finish(finalLog: ResultItem[], finalOutcomes: ReviewOutcome[]) {
     setPhase("result");
     setSaving(true);
     try {
+      const mistakes: KanjiMistake[] = finalLog
+        .filter((i) => !i.isCorrect)
+        .map((i) => ({
+          character: i.character,
+          correct_readings: i.correctReadings,
+          your_answer: i.yourAnswer,
+          mode: "read" as const,
+        }));
       const [pointsResult] = await Promise.all([
         saveKanjiQuizResult({
           grades,
           totalCount: finalOutcomes.length,
-          correctCount: finalOutcomes.length - finalMistakes.length,
-          mistakes: finalMistakes,
+          correctCount: finalOutcomes.length - mistakes.length,
+          mistakes,
         }),
         applyKanjiReviewUpdates(finalOutcomes),
       ]);
@@ -220,11 +242,9 @@ function ReadQuiz({ candidates, grades }: { candidates: QuizCandidate[]; grades:
   if (phase === "result") {
     return (
       <ResultView
-        totalAnswered={correctCount + mistakes.length}
-        correctCount={correctCount}
-        mistakes={mistakes}
+        items={log}
         saving={saving}
-        reachedLimit={mistakes.length >= MISTAKE_LIMIT}
+        reachedLimit={wrongCount >= MISTAKE_LIMIT}
         earnedPoints={earnedPoints}
         totalPoints={totalPoints}
       />
@@ -332,20 +352,16 @@ function WriteQuiz({ candidates, grades }: { candidates: QuizCandidate[]; grades
   }
 
   if (phase === "result") {
-    const correctCount = drawings.filter((_, i) => judgments[i] === true).length;
-    const mistakes: KanjiMistake[] = drawings
-      .filter((_, i) => judgments[i] !== true)
-      .map((d) => ({
-        character: d.candidate.kanji.character,
-        correct_readings: d.candidate.kanji.readings,
-        your_answer: "",
-        mode: "write" as const,
-      }));
+    const items: ResultItem[] = drawings.map((d, i) => ({
+      character: d.candidate.kanji.character,
+      correctReadings: d.candidate.kanji.readings,
+      yourAnswer: "",
+      isCorrect: judgments[i] === true,
+      mode: "write",
+    }));
     return (
       <ResultView
-        totalAnswered={drawings.length}
-        correctCount={correctCount}
-        mistakes={mistakes}
+        items={items}
         saving={saving}
         reachedLimit={false}
         earnedPoints={earnedPoints}

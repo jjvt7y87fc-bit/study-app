@@ -29,11 +29,13 @@ function nextMonth(year: number, month: number) {
 export default function CalendarView({
   year,
   month,
+  view,
   hyakumasuResults,
   kanjiResults,
 }: {
   year: number;
   month: number;
+  view: "me" | "all";
   hyakumasuResults: HyakumasuResult[];
   kanjiResults: KanjiQuizResult[];
 }) {
@@ -71,7 +73,7 @@ export default function CalendarView({
     <div className="space-y-4">
       <div className="flex items-center justify-between rounded-xl border bg-white p-4 shadow-sm">
         <Link
-          href={`/calendar?y=${prev.year}&m=${prev.month}`}
+          href={`/calendar?y=${prev.year}&m=${prev.month}&view=${view}`}
           className="rounded bg-gray-200 px-3 py-1 font-semibold"
         >
           ← 前月
@@ -80,7 +82,7 @@ export default function CalendarView({
           {year}年{month}月
         </p>
         <Link
-          href={`/calendar?y=${next.year}&m=${next.month}`}
+          href={`/calendar?y=${next.year}&m=${next.month}&view=${view}`}
           className="rounded bg-gray-200 px-3 py-1 font-semibold"
         >
           次月 →
@@ -139,6 +141,11 @@ export default function CalendarView({
               <ul className="space-y-2">
                 {selectedHyakumasu.map((r) => (
                   <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                    {view === "all" && (
+                      <span>
+                        {r.profiles?.emoji ?? "❓"} {r.profiles?.name ?? "不明"}
+                      </span>
+                    )}
                     <span>{new Date(r.taken_at).toLocaleTimeString("ja-JP")}</span>
                     <span>{OPERATION_LABELS[r.operation]}</span>
                     <span>{r.time_seconds.toFixed(1)}秒</span>
@@ -159,6 +166,11 @@ export default function CalendarView({
                 {selectedKanji.map((r) => (
                   <li key={r.id} className="text-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
+                      {view === "all" && (
+                        <span>
+                          {r.profiles?.emoji ?? "❓"} {r.profiles?.name ?? "不明"}
+                        </span>
+                      )}
                       <span>{new Date(r.taken_at).toLocaleTimeString("ja-JP")}</span>
                       <span>{r.grades.map((g) => GRADE_LABELS[g]).join("・")}</span>
                       <span>

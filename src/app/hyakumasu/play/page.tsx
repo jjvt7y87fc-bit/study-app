@@ -1,5 +1,5 @@
 import type { Operation } from "@/lib/types";
-import PlayClient from "@/app/hyakumasu/play/PlayClient";
+import PlayClientLoader from "@/app/hyakumasu/play/PlayClientLoader";
 
 const VALID_OPS: Operation[] = ["add", "sub", "mul"];
 
@@ -11,5 +11,5 @@ export default async function HyakumasuPlayPage({
   const { op } = await searchParams;
   const operation = (VALID_OPS.includes(op as Operation) ? op : "add") as Operation;
 
-  return <PlayClient operation={operation} />;
+  return <PlayClientLoader operation={operation} />;
 }

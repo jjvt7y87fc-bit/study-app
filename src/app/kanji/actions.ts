@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { checkDeletePassword } from "@/lib/deletePassword";
+import { getTotalPoints } from "@/lib/petData";
+import { getActiveProfile } from "@/lib/profile";
 import type { Grade, KanjiMistake, ReviewStage } from "@/lib/types";
 
 function parseReadings(raw: string): string[] {
@@ -28,7 +30,7 @@ export async function createKanji(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
-  revalidatePath("/kanji/manage");
+  revalidatePath("/settings");
 }
 
 export async function updateKanji(formData: FormData) {
@@ -55,7 +57,7 @@ export async function updateKanji(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
-  revalidatePath("/kanji/manage");
+  revalidatePath("/settings");
 }
 
 export type BulkImportError = { line: number; text: string; reason: string };
@@ -106,12 +108,12 @@ export async function bulkCreateKanji(formData: FormData): Promise<BulkImportSum
     const { error } = await supabase.from("kanji").insert(rows);
     if (error) {
       errors.push({ line: 0, text: "", reason: `登録時にエラーが発生しました: ${error.message}` });
-      revalidatePath("/kanji/manage");
+      revalidatePath("/settings");
       return { inserted: 0, errors };
     }
   }
 
-  revalidatePath("/kanji/manage");
+  revalidatePath("/settings");
   return { inserted: rows.length, errors };
 }
 
@@ -127,7 +129,7 @@ export async function deleteKanji(
   const { error } = await supabase.from("kanji").delete().eq("id", id);
   if (error) return { success: false, error: error.message };
 
-  revalidatePath("/kanji/manage");
+  revalidatePath("/settings");
   return { success: true };
 }
 
@@ -137,27 +139,27 @@ export async function saveKanjiQuizResult(params: {
   correctCount: number;
   mistakes: KanjiMistake[];
 }): Promise<{ earnedPoints: number; totalPoints: number }> {
+  const earnedPoints = params.correctCount * 10;
+  const activeProfile = await getActiveProfile();
+  const profileId = activeProfile?.id ?? null;
+
   const { error } = await supabase.from("kanji_quiz_results").insert({
     grades: params.grades,
     total_count: params.totalCount,
     correct_count: params.correctCount,
     mistakes: params.mistakes,
+    points: earnedPoints,
+    profile_id: profileId,
   });
 
   if (error) throw new Error(error.message);
 
-  const { data: allResults } = await supabase
-    .from("kanji_quiz_results")
-    .select("correct_count");
-
-  const totalCorrect = (allResults ?? []).reduce((sum, r) => sum + (r.correct_count as number), 0);
+  const totalPoints = await getTotalPoints();
 
   revalidatePath("/kanji/history");
   revalidatePath("/calendar");
-  return {
-    earnedPoints: params.correctCount * 10,
-    totalPoints: totalCorrect * 10,
-  };
+  revalidatePath("/");
+  return { earnedPoints, totalPoints };
 }
 
 export async function deleteKanjiQuizResult(
